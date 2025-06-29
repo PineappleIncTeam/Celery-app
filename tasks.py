@@ -1,16 +1,32 @@
 import os
-
 import requests
-from celery import shared_task
-# from django.core.cache import cache
+import redis
+import json
+from currency_db import Celery
 from dotenv import load_dotenv
-
-from api.models import CurrencyData
+from currency_db import upsert_currency_data, get_all_currency_data
 
 load_dotenv()
 
+app = Celery('standalone_tasks', broker=os.getenv('CELERY_BROKER_URL'))
+app.conf.broker_connection_retry_on_startup = True
 
-@shared_task
+# Redis клиент
+redis_client = redis.Redis.from_url(os.getenv('REDIS_URL'))
+
+# Расписание задач
+app.conf.beat_schedule = {
+    'fetch-currency-daily': {
+        'task': 'tasks.fetch_currency_data',
+        'schedule': 86400.0,  # 24 часа
+    },
+    'update-redis-hourly': {
+        'task': 'tasks.update_redis',
+        'schedule': 3600.0,   # 1 час
+    },
+}
+
+@app.task
 def fetch_currency_data():
     url = "https://api.apilayer.com/currency_data/live"
     api_key = os.getenv("CURRENCY_API_KEY")
@@ -20,21 +36,17 @@ def fetch_currency_data():
         {"source": "BTC", "currencies": "RUB"},
     ]
     headers = {"apikey": api_key}
-    data_all = []
 
     for params in params_list:
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
-            data = response.json()["quotes"]
-            data_all.append(data)
-            print(data_all)
-            for currency, value in data.items():
-                CurrencyData.objects.update_or_create(currency=currency, defaults={"rate": value})
+            data = response.json().get("quotes", {})
+            for currency, rate in data.items():
+                upsert_currency_data(currency, rate)
         else:
-            print(f"Ошибка {response.status_code}: {response.text}")
+            print(f"Error {response.status_code}: {response.text}")
 
-
-@shared_task
+@app.task
 def update_redis():
-    data = list(CurrencyData.objects.all().values("currency", "rate"))
-    cache.set("currency_data", data, timeout=4200)
+    data = get_all_currency_data()
+    redis_client.set("currency_data", json.dumps(data), ex=4200)  # timeout 70 мин

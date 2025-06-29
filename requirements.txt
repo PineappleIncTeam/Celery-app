@@ -1,2 +1,5 @@
-celery==5.3.1
-kombu===5.3.1
+celery
+requests
+psycopg2-binary
+redis
+python-dotenv
