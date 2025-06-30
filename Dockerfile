@@ -5,4 +5,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
-CMD ["sh", "-c", "celery -A FinanceBackend worker -n workercurrency@%h --pool=solo --loglevel=info & celery -A FinanceBackend beat --loglevel=info"]
+CMD ["sh", "-c", "celery -A tasks worker -n workercurrency@%h --pool=solo --loglevel=info & celery -A tasks beat --loglevel=info"]
