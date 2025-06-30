@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: celery-worker
-        image: freenance:{{IMAGE_TAG}}
+        image: freenance/celery-app:{{IMAGE_TAG}}
         env:
         - name: CURRENCY_API_KEY
           valueFrom:
