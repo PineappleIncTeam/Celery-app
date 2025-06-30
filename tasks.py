@@ -2,7 +2,7 @@ import os
 import requests
 import redis
 import json
-from currency_db import Celery
+from celery import Celery
 from dotenv import load_dotenv
 from currency_db import upsert_currency_data, get_all_currency_data
 
